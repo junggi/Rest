@@ -137,7 +137,7 @@ def findBest(data, m):
 
 # scoringType = 0 is like abs(output-ahi): only one point needed to score
 # scoringType = 1 is like RSquared value: all patients needed to score the parameter set
-def extractData(filename, scoringFunction, scoringType, includeOutliers = True):
+def extractData(filename, scoringFunction, scoringType, outliers = []):
     conn = sqlite3.connect(filename)
     c = conn.cursor()
     try:
@@ -154,10 +154,9 @@ def extractData(filename, scoringFunction, scoringType, includeOutliers = True):
                                     results.output, ahi.ahi, ahi.patient FROM results JOIN ahi ON results.patient=ahi.patient
                                     ORDER BY results.dropTime , results.dropPercent, results.Avgrate,
                                     results.minLen, results.maxLen,ahi.patient'''):
-            
-            outliers = [26,14,61,63,83,27]
+
             outliers = ["Alg_ ("+str(num)+")" for num in outliers]
-            if includeOutliers or (row[7] not in outliers):
+            if row[7] not in outliers:
                 for j in range(7):
                     data[j] += [row[j]]
                 patients += [row[7]]
@@ -298,9 +297,14 @@ def plotHeatmap(scoredData, bestParameterSet):
         ax.set_xlabel(parameterList[0])
         ax.set_ylabel(parameterList[1])
         plt.clabel(CS, inline=1, fontsize=10)
-def plotResults(filename,scoringFunction = R2, scoringType = 1, m = False):
+def plotResults(filename,scoringFunction = R2, scoringType = 1, m = False, outliers=[]):
+    print "file:",filename
+    print "scoring function:",scoringFunction.__name__
+    print "type:",scoringType
+    print "min/max:",m
+    print "outliers:",outliers
     
-    scoredData ,  data, patients= extractData(filename,scoringFunction, scoringType)
+    scoredData ,  data, patients= extractData(filename,scoringFunction, scoringType, outliers = outliers)
     
     bestParameterSet , bestScore = findBest(scoredData, m)
     print bestParameterSet, bestScore
@@ -312,7 +316,7 @@ def plotResults(filename,scoringFunction = R2, scoringType = 1, m = False):
     
 ##    plot3D(scoredData, bestParameterSet)
 
-    plotHeatmap(scoredData, bestParameterSet)
+##    plotHeatmap(scoredData, bestParameterSet)
     
     return bestParameterSet, data, scoredData
 
@@ -344,13 +348,18 @@ if __name__ == "__main__":
 ##        for label, xi, yi in zip(labels, x, y):
 ##            plt.annotate(label, xy = (xi, yi), textcoords = 'offset points', ha = 'right', va = 'bottom',
 ##            arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
-        includeOutliers = True
+
+
         
-        plotResults(filename, scoringFunction = R2, scoringType = 1, m = False)
+##        outliers = [26,14,61,63,83,27]
+        outliers = []
+        io = True
+        
+        plotResults(filename, scoringFunction = R2, scoringType = 1, m = False,outliers = outliers)
         print "done", 1
-        plotResults(filename, scoringFunction = spearman, scoringType = 1, m  = False, includeOutliers = includeOutliers)
+        plotResults(filename, scoringFunction = spearman, scoringType = 1, m  = False, outliers = outliers)
         print "done", 2
-        plotResults(filename, scoringFunction = pearson, scoringType = 1, m = False, includeOutliers= includeOutliers)
+        plotResults(filename, scoringFunction = pearson, scoringType = 1, m = False, outliers= outliers)
         print "done", 3
-        plotResults(filename, scoringFunction = closestToAHI, scoringType = 0, m =True, includeOutliers= includeOutliers)
+        plotResults(filename, scoringFunction = closestToAHI, scoringType = 0, m =True, outliers= outliers)
     plt.show()
