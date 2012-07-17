@@ -5,6 +5,7 @@ import numpy as np
 import operator
 import matplotlib.cm as cm
 import matplotlib.mlab as mlab
+import scipy.stats as stats
 
 
 parameterList = ['dropTime', 'dropPercent', 'Avgrate', 'minLen', 'maxLen']
@@ -47,22 +48,25 @@ def findPatients(patientsList):
 def findRSquared(x,y):
     coeffs = np.polyfit(x,y,1)
 
-    p = np.poly1d(coeffs)
-    yhat = [p(z) for z in x]
-    ybar = float(sum(y))/len(y)
-    ssreg = sum([ (yihat - ybar)**2 for yihat in yhat])
-    sstot = sum([ (yi - ybar)**2 for yi in y ])
-    rs = ssreg/sstot
-    return rs
+##    p = np.poly1d(coeffs)
+##    yhat = [p(z) for z in x]
+##    ybar = float(sum(y))/len(y)
+##    ssreg = sum([ (yihat - ybar)**2 for yihat in yhat])
+##    sstot = sum([ (yi - ybar)**2 for yi in y ])
+##    rs = ssreg/sstot
+##    return rs
+    return stats.linregress(x,y)[2]
 
 def findSpearman(x,y):
-    xbar = float(sum(x))/len(x)
-    ybar = float(sum(y))/len(y)
-    p = (sum( [ (x[i]-xbar)*(y[i]-ybar) for i in range(len(x))] ) ) / ( (sum( [ (xi-xbar)**2 for xi in x] )*(sum( [ (yi-ybar)**2 for yi in y] ) ) )**(1/2) )
-    return abs(p)
+##    xbar = float(sum(x))/len(x)
+##    ybar = float(sum(y))/len(y)
+##    p = (sum( [ (x[i]-xbar)*(y[i]-ybar) for i in range(len(x))] ) ) / ( (sum( [ (xi-xbar)**2 for xi in x] )*(sum( [ (yi-ybar)**2 for yi in y] ) ) )**(1/2) )
+##    return abs(p)
+    return stats.spearmanr(x,y)[0]
 
 def findPearson(x,y):
-    return abs(np.cov(x,y)[0][1] / (np.std(x) * np.std(y)))
+##    return abs(np.cov(x,y)[0][1] / (np.std(x) * np.std(y)))
+    return stats.pearsonr(x,y)[0]
 
 # f = findRSquared, findSpearman, findPearson
 def R2in3regions(x,y,f, plot = False):
@@ -133,7 +137,7 @@ def findBest(data, m):
 
 # scoringType = 0 is like abs(output-ahi): only one point needed to score
 # scoringType = 1 is like RSquared value: all patients needed to score the parameter set
-def extractData(filename, scoringFunction, scoringType):
+def extractData(filename, scoringFunction, scoringType, includeOutliers = True):
     conn = sqlite3.connect(filename)
     c = conn.cursor()
     try:
@@ -153,7 +157,7 @@ def extractData(filename, scoringFunction, scoringType):
             
             outliers = [26,14,61,63,83,27]
             outliers = ["Alg_ ("+str(num)+")" for num in outliers]
-            if row[7] not in outliers:
+            if includeOutliers or (row[7] not in outliers):
                 for j in range(7):
                     data[j] += [row[j]]
                 patients += [row[7]]
@@ -205,21 +209,15 @@ def plot6Subplots(scoredData, data, bestParameterSet, patients):
     for j in range(5):
         x = []
         y = []
-        print scoredData.shape[1]
         for i in range(scoredData.shape[1]):
             if abs((scoredData[:,i][(j+1)%5])-(bestParameterSet[(j+1)%5]))<.00001 and abs((scoredData[:,i][(j+2)%5]) -(bestParameterSet[(j+2)%5]))<.00001 and \
                abs((scoredData[:,i][(j+3)%5]) - (bestParameterSet[(j+3)%5]))<.00001 and abs((scoredData[:,i][(j+4)%5]) - (bestParameterSet[(j+4)%5]))<.00001:
                 x += [ scoredData[:,i][j] ]
                 y += [ scoredData[:,i][5] ]
-                if not i:
-                    print x
-                    print y
         plt.subplot(3,2,j+1)
         plt.plot(x,y,'bo')
         plt.axvline(x = bestParameterSet[j])
         plt.title(parameterList[j])
-        print len(x)
-        print x
 
     x = []
     y = []
@@ -241,6 +239,7 @@ def plot6Subplots(scoredData, data, bestParameterSet, patients):
     plt.plot(x,line(x), '--c')
     plt.plot(x,x,'-k')
     plt.title("Output v AHI")
+    print findRSquared(x,y)
     for label, xi, yi in zip(labels, x, y):
         plt.annotate(label, xy = (xi, yi), textcoords = 'offset points', ha = 'right', va = 'bottom',
         arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
@@ -345,12 +344,13 @@ if __name__ == "__main__":
 ##        for label, xi, yi in zip(labels, x, y):
 ##            plt.annotate(label, xy = (xi, yi), textcoords = 'offset points', ha = 'right', va = 'bottom',
 ##            arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
+        includeOutliers = True
         
-        plotResults(filename, m = False)
-##        print "done", 1
-##        plotResults(filename, scoringFunction = spearman, m  = False)
-##        print "done", 2
-##        plotResults(filename, scoringFunction = pearson, m = False)
-##        print "done", 3
-##        plotResults(filename, scoringFunction = closestToAHI, scoringType = 0)
+        plotResults(filename, scoringFunction = R2, scoringType = 1, m = False)
+        print "done", 1
+        plotResults(filename, scoringFunction = spearman, scoringType = 1, m  = False, includeOutliers = includeOutliers)
+        print "done", 2
+        plotResults(filename, scoringFunction = pearson, scoringType = 1, m = False, includeOutliers= includeOutliers)
+        print "done", 3
+        plotResults(filename, scoringFunction = closestToAHI, scoringType = 0, m =True, includeOutliers= includeOutliers)
     plt.show()
