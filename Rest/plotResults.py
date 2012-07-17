@@ -145,6 +145,7 @@ def extractData(filename, scoringFunction, scoringType):
         y = []                                      # list with ahi of each patient for one parameter set
         tempScore = 0
         currentParameterSet = None
+        print c.execute('''SELECT COUNT(id) FROM results''').fetchone()
         for row in c.execute('''SELECT results.dropTime, results.dropPercent, results.Avgrate, results.minLen, results.maxLen,
                                     results.output, ahi.ahi, ahi.patient FROM results JOIN ahi ON results.patient=ahi.patient
                                     ORDER BY results.dropTime , results.dropPercent, results.Avgrate,
@@ -156,13 +157,13 @@ def extractData(filename, scoringFunction, scoringType):
                 for j in range(7):
                     data[j] += [row[j]]
                 patients += [row[7]]
-                if currentParameterSet == None:
+                if not currentParameterSet:
                     currentParameterSet = (row[0], row[1], row[2], row[3], row[4])
                     tempScore = 0
                 if currentParameterSet != (row[0], row[1], row[2], row[3], row[4]):
                     for j in range(5):
                         scoredData[j] += [currentParameterSet[j]]
-                    if scoringType == 0:
+                    if not scoringType:
                         scoredData[5] += [tempScore]
                         tempScore = 0
                     else:
@@ -171,7 +172,7 @@ def extractData(filename, scoringFunction, scoringType):
                         y = []
                     currentParameterSet = (row[0], row[1], row[2], row[3], row[4])
                     
-                if scoringType == 0:
+                if not scoringType:
                     tempScore += scoringFunction(row[5], row[6])
                 else:
                     x += [row[5]]
@@ -204,15 +205,21 @@ def plot6Subplots(scoredData, data, bestParameterSet, patients):
     for j in range(5):
         x = []
         y = []
+        print scoredData.shape[1]
         for i in range(scoredData.shape[1]):
             if abs((scoredData[:,i][(j+1)%5])-(bestParameterSet[(j+1)%5]))<.00001 and abs((scoredData[:,i][(j+2)%5]) -(bestParameterSet[(j+2)%5]))<.00001 and \
-               abs((scoredData[:,i][(j+3)%5]) - (bestParameterSet[(j+3)%5]))<.00001 and abs((scoredData[:,i][(j+4)%5]) == (bestParameterSet[(j+4)%5]))<.00001:
+               abs((scoredData[:,i][(j+3)%5]) - (bestParameterSet[(j+3)%5]))<.00001 and abs((scoredData[:,i][(j+4)%5]) - (bestParameterSet[(j+4)%5]))<.00001:
                 x += [ scoredData[:,i][j] ]
                 y += [ scoredData[:,i][5] ]
+                if not i:
+                    print x
+                    print y
         plt.subplot(3,2,j+1)
         plt.plot(x,y,'bo')
         plt.axvline(x = bestParameterSet[j])
         plt.title(parameterList[j])
+        print len(x)
+        print x
 
     x = []
     y = []
