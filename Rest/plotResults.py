@@ -149,13 +149,12 @@ def extractData(filename, scoringFunction, scoringType, outliers = []):
         y = []                                      # list with ahi of each patient for one parameter set
         tempScore = 0
         currentParameterSet = None
-        print c.execute('''SELECT COUNT(id) FROM results''').fetchone()
+        outliers = ["Alg_ ("+str(num)+")" for num in outliers]
         for row in c.execute('''SELECT results.dropTime, results.dropPercent, results.Avgrate, results.minLen, results.maxLen,
                                     results.output, ahi.ahi, ahi.patient FROM results JOIN ahi ON results.patient=ahi.patient
                                     ORDER BY results.dropTime , results.dropPercent, results.Avgrate,
                                     results.minLen, results.maxLen,ahi.patient'''):
 
-            outliers = ["Alg_ ("+str(num)+")" for num in outliers]
             if row[7] not in outliers:
                 for j in range(7):
                     data[j] += [row[j]]
@@ -180,9 +179,9 @@ def extractData(filename, scoringFunction, scoringType, outliers = []):
                 else:
                     x += [row[5]]
                     y += [row[6]]
-                if i % 100000 == 0 :
-                    print i
-                i+=1
+            if i % 100000 == 0 :
+                print i
+            i+=1
 
         # last iteration
         currentParameterSet = (row[0], row[1], row[2], row[3], row[4])
@@ -351,9 +350,8 @@ if __name__ == "__main__":
 
 
         
-##        outliers = [26,14,61,63,83,27]
-        outliers = []
-        io = True
+        outliers = [26,14,61,63,83,27]
+##        outliers = []
         
         plotResults(filename, scoringFunction = R2, scoringType = 1, m = False,outliers = outliers)
         print "done", 1

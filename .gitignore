@@ -163,13 +163,20 @@ pip-log.txt
 .DS_Store
 
 # Data
-Rest\Logs\
-Rest\RespFiles\
-Rest\db before server-client\rawData\
-Rest\db before server-client\AHI Data\
-Rest\db before server-client\rawData
-Rest\old
-django\
-parameter plots\
-respdata - rc\
-than\
+Rest/db/*
+Rest/ApneaDetector/
+Rest/ApneaDetector-old/
+Rest/RespData/
+Rest/Logs/
+Rest/RespFiles/
+Rest/db before server-client/rawData/
+Rest/db before server-client/AHI Data/
+Rest/db before server-client/temp/
+Rest/old/
+django/
+parameter plots/
+respdata - rc/
+than/
+*.csv
+*.docx
+*.xls
