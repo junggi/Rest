@@ -180,3 +180,7 @@ than/
 *.csv
 *.docx
 *.xls
+*.xlsx
+*.txt
+*.png
+*.dib

@@ -12,7 +12,7 @@ parameterList = ['dropTime', 'dropPercent', 'Avgrate', 'minLen', 'maxLen']
 mildCutoff = 3
 moderateCutoff = 15
 severeCutoff = 25
-minScore = 0           # R2 scoring
+minScore = -1           # R2 scoring
 exp = 3
 # Rounds to 10^exp-th decimal. Currently set to 3.
 # Change if parameters or output need more precision
