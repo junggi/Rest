@@ -13,62 +13,41 @@ mildCutoff = 3
 moderateCutoff = 15
 severeCutoff = 25
 minScore = -1           # R2 scoring
-exp = 3
-# Rounds to 10^exp-th decimal. Currently set to 3.
-# Change if parameters or output need more precision
-def roundTo(r):
-    return int(r*(10**exp))/(10.0**exp)
 
+# basic scoring function
 def closestToAHI(output, ahi):
     return abs(ahi-output)
 
+# R squared scoring function
 def R2(x,y, plot = False):
     return R2in3regions(x,y,findRSquared, plot)
 
+# Spearman coefficient scoring function
 def spearman(x,y,plot = False):
     return R2in3regions(x,y,findSpearman, plot)
 
+# Pearson coefficient scoring function
 def pearson(x,y,plot = False):
     return R2in3regions(x,y,findPearson, plot)
 
-def hasApnea(a):
-    if a>5:
-        return 1
-    else:
-        return 0
-
-def findPatients(patientsList):
-    seen = []
-    for patient in patientsList:
-        if patient not in seen:
-            seen += [patient]
-    return seen
-
-
+# Calculate R squared
 def findRSquared(x,y):
     coeffs = np.polyfit(x,y,1)
-
-##    p = np.poly1d(coeffs)
-##    yhat = [p(z) for z in x]
-##    ybar = float(sum(y))/len(y)
-##    ssreg = sum([ (yihat - ybar)**2 for yihat in yhat])
-##    sstot = sum([ (yi - ybar)**2 for yi in y ])
-##    rs = ssreg/sstot
-##    return rs
     return stats.linregress(x,y)[2]
 
+# calculate spearman coefficient
 def findSpearman(x,y):
-##    xbar = float(sum(x))/len(x)
-##    ybar = float(sum(y))/len(y)
-##    p = (sum( [ (x[i]-xbar)*(y[i]-ybar) for i in range(len(x))] ) ) / ( (sum( [ (xi-xbar)**2 for xi in x] )*(sum( [ (yi-ybar)**2 for yi in y] ) ) )**(1/2) )
-##    return abs(p)
     return stats.spearmanr(x,y)[0]
 
+# calculate pearson coefficient
 def findPearson(x,y):
-##    return abs(np.cov(x,y)[0][1] / (np.std(x) * np.std(y)))
     return stats.pearsonr(x,y)[0]
 
 # f = findRSquared, findSpearman, findPearson
+# Scoring function that separates data into 3 regions based on AHI values, finds
+# linear regression (using function f) in each of the 3 regions. Returns score
+# of the middle region, provided that the other two score higher than at least
+# the minScore. If plot = True, plots the data with the 3 line fits. 
 def R2in3regions(x,y,f, plot = False):
     x1 = []
     y1 = []
@@ -120,15 +99,15 @@ def R2in3regions(x,y,f, plot = False):
         return score2
     else:
         return 0
-    
+
+# finds the parameter set with the best score. Returns the best score and the best parameter set.
+# data = (p1 p2 p3 p4 p5 score)*
 def findBest(data, m):
     d = {}
     for i in range(data.shape[1]):
         parameterSet = (data[:,i][0],data[:,i][1],data[:,i][2],data[:,i][3],data[:,i][4])
         score = data[:,i][5]
-        if parameterSet not in d:
-            d[parameterSet] = 0
-        d[parameterSet] = d[parameterSet]+score
+        d[parameterSet] = score
     if m :
         best = min(d.iteritems(), key = operator.itemgetter(1))[0]
     else:
@@ -137,28 +116,38 @@ def findBest(data, m):
 
 # scoringType = 0 is like abs(output-ahi): only one point needed to score
 # scoringType = 1 is like RSquared value: all patients needed to score the parameter set
+# returns scoredData, data.
+# scoredData has points of form (p1 p2 p3 p4 p5 score). One point for each parameter set.
+# data has points of form (p1 p2 p3 p4 p5 output ahi patient). 
 def extractData(filename, scoringFunction, scoringType, outliers = []):
     conn = sqlite3.connect(filename)
     c = conn.cursor()
     try:
         i = 0
         scoredData = [[],[],[],[],[],[]]            # p1 p2 p3 p4 p5 score
-        data = [[],[],[],[],[],[],[]]               # p1 p2 p3 p4 p5 output ahi
-        patients = []
-        x = []                                      # list with output of each patient for one parameter set
+        data = [[],[],[],[],[],[],[],[]]               # p1 p2 p3 p4 p5 output ahi patient
+        x = []                                       # list with output of each patient for one parameter set
         y = []                                      # list with ahi of each patient for one parameter set
         tempScore = 0
         currentParameterSet = None
         outliers = ["Alg_ ("+str(num)+")" for num in outliers]
+        
+        # row[0]: dropTime
+        # row[1]: dropPercent
+        # row[2]: Avgrate
+        # row[3]: minLen
+        # row[4]: maxLen
+        # row[5]: output
+        # row[6]: ahi
+        # row[7]: patient
         for row in c.execute('''SELECT results.dropTime, results.dropPercent, results.Avgrate, results.minLen, results.maxLen,
                                     results.output, ahi.ahi, ahi.patient FROM results JOIN ahi ON results.patient=ahi.patient
                                     ORDER BY results.dropTime , results.dropPercent, results.Avgrate,
                                     results.minLen, results.maxLen,ahi.patient'''):
-
+            # ignore outlier patients
             if row[7] not in outliers:
-                for j in range(7):
+                for j in range(8):
                     data[j] += [row[j]]
-                patients += [row[7]]
                 if not currentParameterSet:
                     currentParameterSet = (row[0], row[1], row[2], row[3], row[4])
                     tempScore = 0
@@ -200,10 +189,14 @@ def extractData(filename, scoringFunction, scoringType, outliers = []):
         c.close()
         conn.close()
         raise
-    return scoredData, data, np.array(patients)
+    return scoredData, data
 
+# Makes 6 plots:
+# One for each parameter: vary one parameter while fixing the rest at the best parameter.
+# 6th plot is output vs ahi plot, with best fit line. 
 def plot6Subplots(scoredData, data, bestParameterSet, patients):
     plt.figure()
+    # first five
     for j in range(5):
         x = []
         y = []
@@ -217,6 +210,7 @@ def plot6Subplots(scoredData, data, bestParameterSet, patients):
         plt.axvline(x = bestParameterSet[j])
         plt.title(parameterList[j])
 
+    # last
     x = []
     y = []
     labels = []
@@ -242,6 +236,7 @@ def plot6Subplots(scoredData, data, bestParameterSet, patients):
         plt.annotate(label, xy = (xi, yi), textcoords = 'offset points', ha = 'right', va = 'bottom',
         arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
 
+# Plots scoringFunctions plot with the best parameter set. 
 def plotScoringFunction(data, bestParameterSet, patients, scoringFunction):
     x = []
     y = []
@@ -259,6 +254,7 @@ def plotScoringFunction(data, bestParameterSet, patients, scoringFunction):
         plt.annotate(label, xy = (xi, yi), textcoords = 'offset points', ha = 'right', va = 'bottom',
         arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
 
+# makes 9 3D graphs: one for each avgRate value, and each plot is dropTime vs dropPercent vs score. 
 def plot3D(scoredData, bestParameterSet):
     avgRate = [.92,.94,.96,.97,.98,.985,.99,.994,.996]
     fig = plt.figure()
@@ -277,7 +273,8 @@ def plot3D(scoredData, bestParameterSet):
         ax.set_xlabel(parameterList[0])
         ax.set_ylabel(parameterList[1])
         ax.set_zlabel("Score"+str(j))
-        
+
+# makes 9 heat mapplots: one for each avgRate value, and each plot is dropTime vs dropPercent, with points varying color depending on score. 
 def plotHeatmap(scoredData, bestParameterSet):
     avgRate = [.92,.94,.96,.97,.98,.985,.99,.994,.996]
     fig = plt.figure()
@@ -296,6 +293,8 @@ def plotHeatmap(scoredData, bestParameterSet):
         ax.set_xlabel(parameterList[0])
         ax.set_ylabel(parameterList[1])
         plt.clabel(CS, inline=1, fontsize=10)
+
+# runs everything. 
 def plotResults(filename,scoringFunction = R2, scoringType = 1, m = False, outliers=[]):
     print "file:",filename
     print "scoring function:",scoringFunction.__name__
@@ -303,7 +302,7 @@ def plotResults(filename,scoringFunction = R2, scoringType = 1, m = False, outli
     print "min/max:",m
     print "outliers:",outliers
     
-    scoredData ,  data, patients= extractData(filename,scoringFunction, scoringType, outliers = outliers)
+    scoredData ,  data = extractData(filename,scoringFunction, scoringType, outliers = outliers)
     
     bestParameterSet , bestScore = findBest(scoredData, m)
     print bestParameterSet, bestScore
@@ -313,9 +312,9 @@ def plotResults(filename,scoringFunction = R2, scoringType = 1, m = False, outli
     if scoringType == 1:
         plotScoringFunction(data, bestParameterSet, patients, scoringFunction)
     
-##    plot3D(scoredData, bestParameterSet)
+    plot3D(scoredData, bestParameterSet)
 
-##    plotHeatmap(scoredData, bestParameterSet)
+    plotHeatmap(scoredData, bestParameterSet)
     
     return bestParameterSet, data, scoredData
 
@@ -325,30 +324,6 @@ if __name__ == "__main__":
     for name in names:
         print name
         filename = "db before server-client/AHI data/full parameter search results - "+name+".db"
-        
-##        scoredData ,  data, patients= extractData(filename,scoringFunction = R2, scoringType = 1)
-##        
-##        x = []
-##        y = []
-##        labels = []
-##        outliers = [26,14,61,63,83,27]
-##        outliers = ["Alg_ ("+str(num)+")" for num in outliers]
-##        for i in range(data.shape[1]):
-##            if abs((data[:,i][0]) - (18))<.00001 and abs((data[:,i][2]) - (.98))<.00001 \
-##               and abs((data[:,i][1])- (.55))<.00001 and abs((data[:,i][3]) - (2))<.00001 \
-##               and abs((data[:,i][4]) - (50))<.00001:
-##                if patients[i] not in outliers:
-##                    x += [data[:,i][5]]
-##                    y += [data[:,i][6]]
-##                    labels += [patients[i]]
-##                
-##        score = R2(x,y, plot = True)
-##        print score
-##        for label, xi, yi in zip(labels, x, y):
-##            plt.annotate(label, xy = (xi, yi), textcoords = 'offset points', ha = 'right', va = 'bottom',
-##            arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
-
-
         
         outliers = [26,14,61,63,83,27]
 ##        outliers = []
