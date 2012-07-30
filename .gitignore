@@ -177,10 +177,7 @@ django/
 parameter plots/
 respdata - rc/
 than/
-*.csv
 *.docx
-*.xls
-*.xlsx
 *.txt
 *.png
 *.dib
